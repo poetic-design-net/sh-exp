@@ -3,13 +3,13 @@ import { getCategories } from "@/services/categories-server";
 import ProductsOverview from "@/app/(non-admin)/products/products-overview";
 
 export default async function ProductsPage() {
-  const [products, categories] = await Promise.all([
-    getProducts(),
+  const [productsResult, categories] = await Promise.all([
+    getProducts(1, 100), // Get first 100 products
     getCategories(),
   ]);
 
   // Filter for active, in-stock, and visible products only
-  const availableProducts = products.filter(product => 
+  const availableProducts = productsResult.products.filter(product => 
     product.isActive && 
     product.stockStatus === 'instock' &&
     product.catalogVisibility !== 'hidden' &&
