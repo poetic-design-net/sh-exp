@@ -113,9 +113,42 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(mediaItem);
   } catch (error) {
-    console.error('Error in POST /api/media:', error);
+    console.error('Error in POST /api/media:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    });
+
+    // Check for specific error types
+    if (error instanceof Error) {
+      if (error.message.includes('Firebase')) {
+        return NextResponse.json(
+          { error: 'Firebase initialization error. Please check server configuration.' },
+          { status: 500 }
+        );
+      }
+      if (error.message.includes('storage')) {
+        return NextResponse.json(
+          { error: 'Storage access error. Please check bucket configuration.' },
+          { status: 500 }
+        );
+      }
+      if (error.message.includes('auth') || error.message.includes('permission')) {
+        return NextResponse.json(
+          { error: 'Authentication or permission error.' },
+          { status: 403 }
+        );
+      }
+    }
+
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' 
+          ? error instanceof Error ? error.message : String(error)
+          : undefined
+      },
       { status: 500 }
     );
   }

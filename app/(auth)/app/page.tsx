@@ -16,50 +16,90 @@ function DashboardSkeleton() {
   );
 }
 
+// Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
+export const runtime = 'nodejs';
 
+// Helper function to handle auth errors
+function handleAuthError(error: unknown) {
+  console.error('Auth error:', {
+    error,
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined
+  });
+  
+  cookies().delete('session');
+  redirect('/login?error=auth_failed');
+}
+
+// Type for the server component
+type DashboardServerProps = {
+  user: {
+    displayName: string | null;
+    email: string | null;
+  };
+  subscriptions: any[];
+  orders: any[];
+};
+
+// This is a React Server Component
 async function DashboardServer() {
+  console.log('Starting dashboard server render');
+  
   try {
+    // Check for session cookie
     const cookiesList = cookies();
     const sessionCookie = cookiesList.get('session');
 
     if (!sessionCookie?.value) {
       console.error('No session cookie found');
-      redirect('/login');
+      redirect('/login?error=no_session');
     }
 
-    const session = await auth.verifySessionCookie(sessionCookie.value, false); // Don't check revocation to avoid token issues
-    
+    console.log('Verifying session cookie...');
+    let session;
+    try {
+      session = await auth.verifySessionCookie(sessionCookie.value, false);
+    } catch (error) {
+      console.error('Session verification failed:', error);
+      cookies().delete('session');
+      redirect('/login?error=invalid_session');
+    }
+
     if (!session?.uid) {
-      console.error('Invalid session');
-      cookies().delete('session'); // Clear invalid session
-      redirect('/login');
+      console.error('No UID in session');
+      cookies().delete('session');
+      redirect('/login?error=no_uid');
     }
 
-    // Get user role
+    console.log('Getting user data...');
     const userDoc = await db.collection('users').doc(session.uid).get();
     const userData = userDoc.data();
     
     if (!userData) {
-      console.error('User data not found');
+      console.error('No user data found for UID:', session.uid);
       cookies().delete('session');
-      redirect('/login');
+      redirect('/login?error=no_user_data');
     }
 
-    // Check if user has required role
+    // Validate user role
     if (userData.role !== 'admin' && userData.role !== 'user') {
-      console.error('Insufficient permissions');
-      redirect('/');
+      console.error('Invalid user role:', userData.role);
+      redirect('/?error=invalid_role');
     }
 
+    console.log('Getting dashboard data...');
     const data = await getDashboardData(session.uid);
     
-    // Only redirect if user has no access at all
+    // Check access
     if (!data.subscriptions.length && !data.orders.length && !userData.role) {
+      console.log('No access data found, redirecting to products');
       redirect('/products');
     }
+
+    console.log('Rendering dashboard content');
 
     return (
       <DashboardContent 
@@ -72,16 +112,11 @@ async function DashboardServer() {
       />
     );
   } catch (error) {
-    console.error('Error in DashboardServer:', error);
-    // Clear session cookie on auth errors
-    if (error instanceof Error && 
-        (error.message.includes('session') || error.message.includes('token'))) {
-      cookies().delete('session');
-    }
-    redirect('/login');
+    handleAuthError(error);
   }
 }
 
+// Main dashboard page component
 export default function UserDashboard() {
   return (
     <Suspense fallback={<DashboardSkeleton />}>
@@ -89,3 +124,7 @@ export default function UserDashboard() {
     </Suspense>
   );
 }
+
+// Add type declarations for better TypeScript support
+UserDashboard.displayName = 'UserDashboard';
+DashboardServer.displayName = 'DashboardServer';

@@ -5,8 +5,22 @@ import Image from "next/image";
 import { useState } from "react";
 import { SignUpForm } from "@/components/auth/sign-up-form";
 
+import { useSearchParams } from 'next/navigation';
+
+const ERROR_MESSAGES = {
+  auth_failed: 'Authentifizierung fehlgeschlagen. Bitte versuchen Sie es erneut.',
+  no_session: 'Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
+  invalid_session: 'Ungültige Sitzung. Bitte melden Sie sich erneut an.',
+  no_uid: 'Benutzer-ID nicht gefunden. Bitte melden Sie sich erneut an.',
+  no_user_data: 'Benutzerdaten nicht gefunden. Bitte melden Sie sich erneut an.',
+  invalid_role: 'Unzureichende Berechtigungen für den Zugriff.',
+};
+
 export default function LoginPage() {
   const [showSignUp, setShowSignUp] = useState(false);
+  const searchParams = useSearchParams();
+  const errorCode = searchParams?.get('error');
+  const errorMessage = errorCode ? ERROR_MESSAGES[errorCode as keyof typeof ERROR_MESSAGES] : null;
 
   return (
     <div className="flex min-h-screen">
@@ -30,7 +44,7 @@ export default function LoginPage() {
       {/* Right side - Form */}
       <div className="w-full lg:w-2/3 flex items-center justify-center p-8 sm:p-12 bg-gray-50">
         <div className="w-full max-w-md space-y-8">
-          <div className="text-center">
+          <div className="text-center space-y-4">
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">
               {showSignUp ? 'Erstelle deinen Account' : 'Anmelden'}
             </h1>
@@ -39,6 +53,11 @@ export default function LoginPage() {
                 ? 'Bereits registriert? Dann melde dich an' 
                 : 'Noch kein Account? Dann registriere dich jetzt'}
             </p>
+            {errorMessage && (
+              <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
+                {errorMessage}
+              </div>
+            )}
           </div>
 
           <div className="mt-8">

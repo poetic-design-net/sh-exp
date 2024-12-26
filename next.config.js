@@ -72,7 +72,25 @@ const nextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=300, stale-while-revalidate=60',
+            value: 'no-store, must-revalidate',
+          }
+        ]
+      },
+      {
+        source: '/app/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, must-revalidate',
+          }
+        ]
+      },
+      {
+        source: '/admin/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, must-revalidate',
           }
         ]
       },
@@ -177,6 +195,10 @@ const nextConfig = {
         {
           source: '/admin/:path*',
           destination: '/admin/:path*',
+        },
+        {
+          source: '/app/:path*',
+          destination: '/app/:path*',
         },
         {
           source: '/login',

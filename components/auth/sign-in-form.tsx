@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { ModalForgotPassword } from "@/components/auth/modal-forgot-password";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 const formSchema = z.object({
   email: z.string().email("Bitte gebe eine gültige E-Mail-Adresse ein"),
@@ -34,6 +34,7 @@ export const SignInForm: FC<SignInFormProps> = ({ onShowSignUp }) => {
   const { auth } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isResetOpen, setIsResetOpen] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -73,13 +74,34 @@ export const SignInForm: FC<SignInFormProps> = ({ onShowSignUp }) => {
         description: "Du wurdest erfolgreich angemeldet.",
       });
       
-      // If we're on the login page, redirect to /app
-      if (pathname === '/login') {
-        router.replace('/app');
-      } else {
-        // Otherwise refresh the current page to update auth state
-        router.refresh();
-      }
+      // Wait for session cookie to be set
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Handle redirect after successful login
+      const handleRedirect = () => {
+        const redirectPath = searchParams?.get('redirect');
+        const defaultPath = '/app';
+        const targetPath = redirectPath || defaultPath;
+        
+        console.log('Handling redirect:', {
+          redirectPath,
+          defaultPath,
+          targetPath,
+          currentPath: pathname
+        });
+        
+        if (pathname === '/login') {
+          // Use push instead of replace to avoid segment mismatch
+          router.push(targetPath);
+        } else {
+          // For other pages, refresh to update auth state
+          router.refresh();
+        }
+      };
+
+      // Wait for session cookie to be set
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      handleRedirect();
       
     } catch (error) {
       let errorMessage = 'Ein Fehler ist aufgetreten';
