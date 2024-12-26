@@ -11,20 +11,26 @@ import {
   SelectValue,
 } from "components/ui/select";
 import { Badge } from "components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "components/ui/dialog";
 import { useToast } from "components/ui/use-toast";
 
 interface MediaLibraryProps {
   items: MediaItem[];
+  total: number;
+  currentPage: number;
+  onPageChange: (page: number) => void;
   selectedUrl?: string;
   onSelect: (item: MediaItem) => void;
   onDelete?: (item: MediaItem) => void;
   onUpdateTags?: (id: string, tags: string[]) => Promise<void>;
   onUpdateCategory?: (id: string, category: string) => Promise<void>;
   isDeleting?: string;
+  onCategoryChange?: (category: string) => void;
+  onSearch?: (term: string) => void;
+  itemsPerPage?: number;
 }
 
-const ITEMS_PER_PAGE = 24;
+const DEFAULT_ITEMS_PER_PAGE = 20;
 
 const CATEGORIES = [
   { value: "all", label: "Alle" },
@@ -37,15 +43,20 @@ const CATEGORIES = [
 
 export function MediaLibrary({
   items,
+  total,
+  currentPage,
+  onPageChange,
   selectedUrl,
   onSelect,
   onDelete,
   onUpdateTags,
   onUpdateCategory,
   isDeleting,
+  onCategoryChange,
+  onSearch,
+  itemsPerPage = DEFAULT_ITEMS_PER_PAGE
 }: MediaLibraryProps) {
   const { toast } = useToast();
-  const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "name" | "size">("date");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("asc");
@@ -57,15 +68,6 @@ export function MediaLibrary({
   const [newTag, setNewTag] = useState("");
   const [showingInfo, setShowingInfo] = useState<string | null>(null);
 
-  const categories = useMemo(() => {
-    if (!Array.isArray(items) || items.length === 0) return ['all', 'uncategorized'];
-    const itemCategories = new Set(items.map(item => {
-      const category = item?.category || 'uncategorized';
-      return CATEGORIES.find(cat => cat.value === category) ? category : 'uncategorized';
-    }));
-    return ['all', ...Array.from(itemCategories)];
-  }, [items]);
-
   const allTags = useMemo(() => {
     if (!Array.isArray(items)) return [];
     const tags = new Set<string>();
@@ -75,56 +77,7 @@ export function MediaLibrary({
     return Array.from(tags).sort();
   }, [items]);
 
-  const filteredAndSortedItems = useMemo(() => {
-    if (!Array.isArray(items)) return [];
-    let result = [...items];
-
-    if (selectedCategory !== 'all') {
-      result = result.filter(item => {
-        if (selectedCategory === 'uncategorized') {
-          return !item.category || item.category === 'uncategorized';
-        }
-        return item.category === selectedCategory && CATEGORIES.some(cat => cat.value === selectedCategory);
-      });
-    }
-
-    if (selectedTags.length > 0) {
-      result = result.filter(item => 
-        selectedTags.every((tag: string) => item.tags?.includes(tag))
-      );
-    }
-
-    if (searchTerm) {
-      result = result.filter(item =>
-        item.filename.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.tags?.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    }
-
-    result.sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case "date":
-          comparison = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          break;
-        case "name":
-          comparison = a.filename.localeCompare(b.filename);
-          break;
-        case "size":
-          comparison = (a.size || 0) - (b.size || 0);
-          break;
-      }
-      return sortOrder === "asc" ? comparison : -comparison;
-    });
-
-    return result;
-  }, [items, searchTerm, sortBy, sortOrder, selectedCategory, selectedTags]);
-
-  const totalPages = Math.ceil(filteredAndSortedItems.length / ITEMS_PER_PAGE);
-  const paginatedItems = filteredAndSortedItems.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const totalPages = Math.ceil(total / itemsPerPage);
 
   const formatFileSize = (bytes?: number) => {
     if (bytes === undefined || bytes === null) return "Unbekannte Größe";
@@ -185,6 +138,20 @@ export function MediaLibrary({
     }
   };
 
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    if (onSearch) {
+      onSearch(value);
+    }
+  };
+
+  const handleCategorySelect = (value: string) => {
+    setSelectedCategory(value);
+    if (onCategoryChange) {
+      onCategoryChange(value);
+    }
+  };
+
   const getDisplayName = (item: MediaItem) => {
     if (item.tags && item.tags.length > 0) {
       return item.tags.join(', ');
@@ -200,46 +167,22 @@ export function MediaLibrary({
             <Input
               placeholder="Suchen..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
               className="max-w-xs"
             />
             <Select 
               value={selectedCategory} 
-              onValueChange={setSelectedCategory}
-              defaultValue="all"
+              onValueChange={handleCategorySelect}
             >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Kategorie..." />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORIES.filter(cat => {
-                  if (cat.value === 'all') return true;
-                  if (cat.value === 'uncategorized') return true;
-                  return Array.isArray(items) && items.some(item => item?.category === cat.value);
-                }).map(cat => (
+                {CATEGORIES.map(cat => (
                   <SelectItem key={cat.value} value={cat.value}>
                     {cat.label}
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-            <Select value={sortBy} onValueChange={(value: "date" | "name" | "size") => setSortBy(value)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Sortieren nach..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="date">Datum</SelectItem>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="size">Größe</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={sortOrder} onValueChange={(value: "asc" | "desc") => setSortOrder(value)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Reihenfolge..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="asc">Aufsteigend</SelectItem>
-                <SelectItem value="desc">Absteigend</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -286,7 +229,7 @@ export function MediaLibrary({
 
       {viewMode === "grid" ? (
         <div className="grid grid-cols-5 gap-2">
-          {paginatedItems.map((item) => (
+          {items.map((item) => (
             <div
               key={item.id}
               className={`
@@ -370,7 +313,7 @@ export function MediaLibrary({
             <div>Aktionen</div>
           </div>
           <div className="divide-y">
-            {paginatedItems.map((item) => (
+            {items.map((item) => (
               <div
                 key={item.id}
                 className={`
@@ -382,7 +325,7 @@ export function MediaLibrary({
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-8 h-8 rounded overflow-hidden flex-shrink-0">
                     <img
-                      src={item.variants?.small?.url ?? item.url}
+                      src={item.variants?.thumbnail?.url ?? item.url}
                       alt={getDisplayName(item)}
                       className="w-full h-full object-cover"
                     />
@@ -404,7 +347,7 @@ export function MediaLibrary({
                   </div>
                 </div>
                 <div>{formatDate(item.createdAt)}</div>
-                <div>{formatFileSize(item.variants?.large?.size ?? item.size)}</div>
+                <div>{formatFileSize(item.size)}</div>
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
@@ -436,7 +379,7 @@ export function MediaLibrary({
                       variant="outline"
                       onClick={() => setEditingCategory(item.id)}
                     >
-                      <Tag className="h-4 w-4" />
+                      <FolderPlus className="h-4 w-4" />
                     </Button>
                   )}
                   {onDelete && (
@@ -456,7 +399,7 @@ export function MediaLibrary({
         </div>
       )}
 
-      {paginatedItems.length === 0 && (
+      {items.length === 0 && (
         <div className="py-8 text-center text-muted-foreground">
           {searchTerm ? "Keine Bilder entsprechen Ihrer Suche" : "Noch keine Bilder hochgeladen"}
         </div>
@@ -465,19 +408,19 @@ export function MediaLibrary({
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
           <div className="text-sm text-muted-foreground">
-            Zeige {((currentPage - 1) * ITEMS_PER_PAGE) + 1} bis {Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSortedItems.length)} von {filteredAndSortedItems.length} Elementen
+            Zeige {((currentPage - 1) * itemsPerPage) + 1} bis {Math.min(currentPage * itemsPerPage, total)} von {total} Elementen
           </div>
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
             >
               Zurück
             </Button>
             <Button
               variant="outline"
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
             >
               Weiter
@@ -531,7 +474,7 @@ export function MediaLibrary({
                 </Button>
               </div>
               <div className="flex gap-2 flex-wrap">
-                {Array.isArray(items) && items.find(i => i.id === editingTags)?.tags?.map((tag: string) => (
+                {items.find(i => i.id === editingTags)?.tags?.map((tag: string) => (
                   <Badge
                     key={tag}
                     variant="secondary"
@@ -562,7 +505,7 @@ export function MediaLibrary({
             </DialogHeader>
             <div className="space-y-4">
               <Select
-                value={Array.isArray(items) ? (items.find(i => i.id === editingCategory)?.category || 'uncategorized') : 'uncategorized'}
+                value={items.find(i => i.id === editingCategory)?.category || 'uncategorized'}
                 onValueChange={(category) => {
                   if (editingCategory && CATEGORIES.some(cat => cat.value === category)) {
                     handleCategoryUpdate(editingCategory, category);
@@ -592,7 +535,6 @@ export function MediaLibrary({
               <DialogTitle>Bildinformationen</DialogTitle>
             </DialogHeader>
             {(() => {
-              if (!Array.isArray(items)) return null;
               const item = items.find(i => i.id === showingInfo);
               if (!item) return null;
 

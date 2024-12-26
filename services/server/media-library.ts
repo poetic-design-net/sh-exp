@@ -34,28 +34,30 @@ async function processImage(buffer: Buffer, width: number, isMax: boolean = fals
     const image = sharp(buffer, {
       limitInputPixels: 268402689, // 16384 x 16384 pixels
       sequentialRead: true
-    });
+    }).rotate(); // Auto-rotate based on EXIF
 
     // Get image info to make intelligent compression decisions
     const metadata = await image.metadata();
     const isPhotographic = metadata.hasAlpha;
 
+    // Memory efficient pipeline
     return await image
       .resize(width, null, {
         fit: 'inside',
         withoutEnlargement: true,
-        fastShrinkOnLoad: true
+        fastShrinkOnLoad: true,
+        kernel: 'lanczos2' // Less memory intensive than default
       })
       .webp({
         quality: isMax ? 75 : 65,
-        effort: 4,
+        effort: 2, // Lower effort = less memory usage
         lossless: false,
         nearLossless: false,
         smartSubsample: true,
         alphaQuality: isPhotographic ? 75 : 65,
         force: true
       })
-      .toBuffer();
+      .toBuffer({ resolveWithObject: false }); // Don't include metadata in response
   } catch (error) {
     console.error('Error in processImage:', error);
     throw error;
@@ -128,22 +130,27 @@ export async function uploadMedia(
     let mainSize: number;
     
     if (isImage) {
-      console.log('Original file size:', file.length);
-      // Upload all size variants for images
-      const results = await Promise.all(
-        Object.keys(SIZES).map(async (variantName) => {
-          const result = await uploadImageVariant(
-            bucket,
-            file,
-            filename,
-            variantName
-          );
-          console.log(`${variantName} variant size:`, result.size);
-          return result;
-        })
-      );
+      // Process variants sequentially to reduce memory usage
+      const variantNames = Object.keys(SIZES);
+      const results = [];
+      
+      for (const variantName of variantNames) {
+        const result = await uploadImageVariant(
+          bucket,
+          file,
+          filename,
+          variantName
+        );
+        console.log(`${variantName} variant size:`, result.size);
+        results.push(result);
+        
+        // Clear buffer after each variant
+        if (global.gc) {
+          global.gc();
+        }
+      }
 
-      // Store URLs and sizes in variants with new names
+      // Store URLs and sizes in variants
       results.forEach(({ variantName, url, size }) => {
         if (variantName === 'thumbnail' || variantName === 'full') {
           variants[variantName] = { url, size };
@@ -228,12 +235,35 @@ export async function deleteMedia(id: string): Promise<void> {
   }
 }
 
-export async function getMediaItems(): Promise<MediaItem[]> {
-  const snapshot = await db.collection('media')
-    .orderBy('createdAt', 'desc')
+export async function getMediaItems({ 
+  page = 1, 
+  limit = 20,
+  category
+}: { 
+  page?: number; 
+  limit?: number;
+  category?: string;
+} = {}): Promise<{ items: MediaItem[]; total: number }> {
+  // Start with base query
+  let query = db.collection('media')
+    .orderBy('createdAt', 'desc');
+  
+  // Add category filter if specified
+  if (category) {
+    query = query.where('category', '==', category);
+  }
+
+  // Get total count
+  const countSnapshot = await query.count().get();
+  const total = countSnapshot.data().count;
+
+  // Apply pagination
+  const offset = (page - 1) * limit;
+  const snapshot = await query
+    .limit(limit)
+    .offset(offset)
     .get();
 
-  // Filter results to only return main entries
   const items = snapshot.docs
     .map(doc => {
       const data = doc.data();
@@ -244,10 +274,9 @@ export async function getMediaItems(): Promise<MediaItem[]> {
         updatedAt: data.updatedAt?.toDate(),
       } as MediaItem;
     })
-    // Filter out thumbnail variants
     .filter(item => !item.filename.includes('-thumbnail.webp'));
 
-  return items;
+  return { items, total };
 }
 
 export async function updateMediaTags(id: string, tags: string[]): Promise<void> {

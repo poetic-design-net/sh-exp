@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     const { items, total } = await getMediaItems({
       page,
-      limit,
+      limit: Math.min(limit, 20), // Limit maximum items per page
       category
     });
     
@@ -55,6 +55,11 @@ export async function GET(request: NextRequest) {
       page,
       limit,
       totalPages: Math.ceil(total / limit)
+    }, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'public, max-age=60, stale-while-revalidate=600'
+      }
     });
 
     // Add strong caching headers with revalidation
