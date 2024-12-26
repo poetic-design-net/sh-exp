@@ -12,7 +12,6 @@ import { Check, Loader2, ImageIcon, Video, Music, File, Info } from 'lucide-reac
 import { ContentType } from '@/types/membership-page';
 import type { MouseEvent } from 'react';
 
-// Rest of the file content remains the same
 interface MediaPickerProps {
   open: boolean;
   onClose: () => void;

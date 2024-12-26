@@ -18,14 +18,18 @@ export interface MediaItem {
   tags?: string[];
   productId?: string;
   variants?: {
-    thumbnail?: { url: string; size: number };
-    full?: { url: string; size: number };
+    small?: { url: string; size: number };
+    medium?: { url: string; size: number };
+    large?: { url: string; size: number };
+    max?: { url: string; size: number };
   };
 }
 
 const SIZES = {
-  thumbnail: 400,
-  full: 1920
+  small: 400,
+  medium: 800,
+  large: 1200,
+  max: 1920
 };
 
 async function processImage(buffer: Buffer, width: number, isMax: boolean = false): Promise<Buffer> {
@@ -34,30 +38,28 @@ async function processImage(buffer: Buffer, width: number, isMax: boolean = fals
     const image = sharp(buffer, {
       limitInputPixels: 268402689, // 16384 x 16384 pixels
       sequentialRead: true
-    }).rotate(); // Auto-rotate based on EXIF
+    });
 
     // Get image info to make intelligent compression decisions
     const metadata = await image.metadata();
     const isPhotographic = metadata.hasAlpha;
 
-    // Memory efficient pipeline
     return await image
       .resize(width, null, {
         fit: 'inside',
         withoutEnlargement: true,
-        fastShrinkOnLoad: true,
-        kernel: 'lanczos2' // Less memory intensive than default
+        fastShrinkOnLoad: true
       })
       .webp({
-        quality: isMax ? 75 : 65,
-        effort: 2, // Lower effort = less memory usage
+        quality: isMax ? 70 : 60,
+        effort: 4,
         lossless: false,
         nearLossless: false,
         smartSubsample: true,
-        alphaQuality: isPhotographic ? 75 : 65,
+        alphaQuality: isPhotographic ? 70 : 60,
         force: true
       })
-      .toBuffer({ resolveWithObject: false }); // Don't include metadata in response
+      .toBuffer();
   } catch (error) {
     console.error('Error in processImage:', error);
     throw error;
@@ -130,37 +132,30 @@ export async function uploadMedia(
     let mainSize: number;
     
     if (isImage) {
-      // Process variants sequentially to reduce memory usage
-      const variantNames = Object.keys(SIZES);
-      const results = [];
-      
-      for (const variantName of variantNames) {
-        const result = await uploadImageVariant(
-          bucket,
-          file,
-          filename,
-          variantName
-        );
-        console.log(`${variantName} variant size:`, result.size);
-        results.push(result);
-        
-        // Clear buffer after each variant
-        if (global.gc) {
-          global.gc();
-        }
-      }
+      console.log('Original file size:', file.length);
+      // Upload all size variants for images
+      const results = await Promise.all(
+        Object.keys(SIZES).map(async (variantName) => {
+          const result = await uploadImageVariant(
+            bucket,
+            file,
+            filename,
+            variantName
+          );
+          console.log(`${variantName} variant size:`, result.size);
+          return result;
+        })
+      );
 
       // Store URLs and sizes in variants
       results.forEach(({ variantName, url, size }) => {
-        if (variantName === 'thumbnail' || variantName === 'full') {
-          variants[variantName] = { url, size };
-        }
+        variants[variantName] = { url, size };
       });
 
-      // Use full variant as main
-      const fullVariant = results.find(r => r.variantName === 'full');
-      mainUrl = fullVariant?.url || '';
-      mainSize = fullVariant?.size || 0;
+      // Use large variant as main
+      const largeVariant = results.find(r => r.variantName === 'large');
+      mainUrl = largeVariant?.url || variants.medium.url;
+      mainSize = largeVariant?.size || variants.medium.size;
     } else {
       // For non-image files, upload as-is
       const path = `media/${Date.now()}-${filename}`;
@@ -177,7 +172,7 @@ export async function uploadMedia(
 
     const mediaItem: Omit<MediaItem, 'id'> = {
       url: mainUrl,
-      filename: isImage ? getWebPFilename(filename, 'full') : filename,
+      filename: isImage ? getWebPFilename(filename, 'large') : filename,
       contentType: isImage ? 'image/webp' : contentType,
       size: mainSize,
       createdAt: new Date(),
@@ -186,8 +181,10 @@ export async function uploadMedia(
       category: derivedCategory,
       tags: tags || [],
       variants: isImage ? {
-        thumbnail: variants.thumbnail,
-        full: variants.full
+        small: variants.small,
+        medium: variants.medium,
+        large: variants.large,
+        max: variants.max
       } : undefined
     };
 
@@ -235,35 +232,12 @@ export async function deleteMedia(id: string): Promise<void> {
   }
 }
 
-export async function getMediaItems({ 
-  page = 1, 
-  limit = 20,
-  category
-}: { 
-  page?: number; 
-  limit?: number;
-  category?: string;
-} = {}): Promise<{ items: MediaItem[]; total: number }> {
-  // Start with base query
-  let query = db.collection('media')
-    .orderBy('createdAt', 'desc');
-  
-  // Add category filter if specified
-  if (category) {
-    query = query.where('category', '==', category);
-  }
-
-  // Get total count
-  const countSnapshot = await query.count().get();
-  const total = countSnapshot.data().count;
-
-  // Apply pagination
-  const offset = (page - 1) * limit;
-  const snapshot = await query
-    .limit(limit)
-    .offset(offset)
+export async function getMediaItems(): Promise<MediaItem[]> {
+  const snapshot = await db.collection('media')
+    .orderBy('createdAt', 'desc')
     .get();
 
+  // Filter results to only return main entries
   const items = snapshot.docs
     .map(doc => {
       const data = doc.data();
@@ -274,9 +248,12 @@ export async function getMediaItems({
         updatedAt: data.updatedAt?.toDate(),
       } as MediaItem;
     })
-    .filter(item => !item.filename.includes('-thumbnail.webp'));
+    // Filter out entries that are variants themselves
+    .filter(item => !item.filename.includes('-small.webp') && 
+                    !item.filename.includes('-medium.webp') && 
+                    !item.filename.includes('-max.webp'));
 
-  return { items, total };
+  return items;
 }
 
 export async function updateMediaTags(id: string, tags: string[]): Promise<void> {

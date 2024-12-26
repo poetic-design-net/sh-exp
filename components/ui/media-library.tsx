@@ -229,7 +229,7 @@ export function MediaLibrary({
 
       {viewMode === "grid" ? (
         <div className="grid grid-cols-5 gap-2">
-          {items.map((item) => (
+          {Array.isArray(items) && items.map((item) => (
             <div
               key={item.id}
               className={`
@@ -313,7 +313,7 @@ export function MediaLibrary({
             <div>Aktionen</div>
           </div>
           <div className="divide-y">
-            {items.map((item) => (
+            {Array.isArray(items) && items.map((item) => (
               <div
                 key={item.id}
                 className={`
