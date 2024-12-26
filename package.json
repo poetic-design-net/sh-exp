@@ -4,7 +4,6 @@
   "author": "Enesien Software <contact@enesien.com> (https://enesien.com)",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev:emulator": "node scripts/start-dev.js",
     "export:data": "node scripts/export-firestore-data.js",
