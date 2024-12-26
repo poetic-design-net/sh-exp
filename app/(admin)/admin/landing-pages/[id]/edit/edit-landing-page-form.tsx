@@ -2,10 +2,10 @@
 
 import { FC, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { updateLandingPage } from "@/services/landing-pages";
+import { Button } from "components/ui/button";
+import { useToast } from "components/ui/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "components/ui/tabs";
+import { updateLandingPage } from "services/landing-pages";
 import { BasicInfoTab } from "./components/basic-info-tab";
 import { HeroTab } from "./components/hero-tab";
 import { IntroTab } from "./components/intro-tab";
@@ -13,7 +13,7 @@ import { RegisterTab } from "./components/register-tab";
 import { NavigationTab } from "./components/navigation-tab";
 import { FAQTab } from "./components/faq-tab";
 import { FooterTab } from "./components/footer-tab";
-import type { LandingPage, NavigationItem, FooterFormData, FAQFormData } from "@/types/landing-page";
+import type { LandingPage, NavigationItem, FooterFormData, FAQFormData } from "types/landing-page";
 import type { RegisterComponentProps } from "./components/component-props";
 
 // Define tab names here for easy customization

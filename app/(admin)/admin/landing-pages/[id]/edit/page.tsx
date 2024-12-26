@@ -1,6 +1,6 @@
-import { getLandingPages } from "@/services/landing-pages";
-import { EditLandingPageForm } from "@/app/(admin)/admin/landing-pages/[id]/edit/edit-landing-page-form";
-import type { LandingPage } from "@/types/landing-page";
+import { getLandingPages } from "app/actions/landing-pages";
+import { EditLandingPageForm } from "./edit-landing-page-form";
+import type { LandingPage } from "types/landing-page";
 
 // Force dynamic rendering for admin routes
 export const dynamic = 'force-dynamic';
