@@ -1,0 +1,131 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# Firebase
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+firebase-export/
+.firebase/
+firestore.rules
+storage.rules
+firestore.indexes.json
+firebase.json
+.firebaserc
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+.next
+.swc/
+
+# production
+/build
+/dist
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env*.local
+.env.production
+.env.development
+.env
+.env.*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# Development tools and migrations
+/tools/
+/scripts/migrate-*.js
+/scripts/migrate-*.mjs
+/scripts/test-*.js
+/scripts/test-*.mjs
+/scripts/list-*.js
+/scripts/list-*.mjs
+/scripts/add-*.js
+/scripts/add-*.mjs
+
+# Firebase
+/components/stefanhiene-2ec0a-firebase-adminsdk-*.json
+stefanhienegit
+stefanhienegit.pub
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+.firebaserc
+*.cache
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.swp
+*.swo
+*~
+
+# API migration routes (only needed for initial setup)
+/app/api/migrate-*/
+/app/api/test-*/
+/app/api/cleanup-*/
+
+# Cache directories
+.cache/
+.eslintcache
+.stylelintcache
+.npm
+
+# Build artifacts
+*.map
+stats.json
+.webpack/
+
+# Storybook
+storybook-static/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+pages/api/test.ts
