@@ -47,12 +47,12 @@ async function processImage(buffer: Buffer, width: number, isMax: boolean = fals
         fastShrinkOnLoad: true
       })
       .webp({
-        quality: isMax ? 75 : 70,
+        quality: isMax ? 75 : 65,
         effort: 4,
         lossless: false,
         nearLossless: false,
         smartSubsample: true,
-        alphaQuality: isPhotographic ? 75 : 70,
+        alphaQuality: isPhotographic ? 75 : 65,
         force: true
       })
       .toBuffer();
