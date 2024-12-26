@@ -1,73 +1,76 @@
-import { auth } from "@/lib/firebase-admin-server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from 'lib/firebase-admin-server';
+import { cookies } from 'next/headers';
 
-const COOKIE_NAME = 'session';
-const MAX_AGE = 60 * 60 * 24 * 5; // 5 days in seconds
+const SESSION_COOKIE_NAME = 'session';
+const SESSION_EXPIRATION_TIME = 60 * 60 * 24 * 5 * 1000; // 5 days
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const { idToken } = await request.json();
-    
+
     if (!idToken) {
-      return new NextResponse('No token provided', { status: 401 });
+      return NextResponse.json(
+        { error: 'ID token is required' },
+        { status: 400 }
+      );
     }
 
-    // Create proper session cookie in both development and production
+    // Create session cookie
     const sessionCookie = await auth.createSessionCookie(idToken, {
-      expiresIn: MAX_AGE * 1000,
+      expiresIn: SESSION_EXPIRATION_TIME
     });
 
-    // Create response with cookie
-    const response = new NextResponse(
-      JSON.stringify({ status: 'success' }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    // Set cookie in response
-    response.cookies.set({
-      name: COOKIE_NAME,
+    // Set cookie options
+    const options = {
+      name: SESSION_COOKIE_NAME,
       value: sessionCookie,
-      maxAge: MAX_AGE,
+      maxAge: SESSION_EXPIRATION_TIME / 1000,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       path: '/',
-    });
+      sameSite: 'lax' as const,
+    };
 
-    return response;
+    // Set the cookie
+    cookies().set(options);
+
+    return NextResponse.json(
+      { status: 'success' },
+      { 
+        status: 200,
+        headers: {
+          'Cache-Control': 'private, no-store'
+        }
+      }
+    );
   } catch (error) {
-    console.error('Session creation error:', error);
-    return new NextResponse(
-      JSON.stringify({ error: 'Internal server error' }), 
+    console.error('Error creating session:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE() {
-  const response = new NextResponse(
-    JSON.stringify({ status: 'success' }),
-    {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  // Delete cookie by setting maxAge to 0
-  response.cookies.set({
-    name: COOKIE_NAME,
-    value: '',
-    maxAge: 0,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-  });
-
-  return response;
+  try {
+    cookies().delete(SESSION_COOKIE_NAME);
+    
+    return NextResponse.json(
+      { status: 'success' },
+      { 
+        status: 200,
+        headers: {
+          'Cache-Control': 'private, no-store'
+        }
+      }
+    );
+  } catch (error) {
+    console.error('Error deleting session:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }

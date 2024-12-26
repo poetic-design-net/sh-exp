@@ -232,12 +232,32 @@ export async function deleteMedia(id: string): Promise<void> {
   }
 }
 
-export async function getMediaItems(): Promise<MediaItem[]> {
-  const snapshot = await db.collection('media')
-    .orderBy('createdAt', 'desc')
+export async function getMediaItems({ 
+  page = 1, 
+  limit = 20,
+  category
+}: { 
+  page?: number; 
+  limit?: number;
+  category?: string;
+} = {}): Promise<{ items: MediaItem[]; total: number }> {
+  let query = db.collection('media')
+    .orderBy('createdAt', 'desc');
+
+  if (category) {
+    query = query.where('category', '==', category);
+  }
+
+  // Get total count
+  const totalSnapshot = await query.count().get();
+  const total = totalSnapshot.data().count;
+
+  // Get paginated results
+  const snapshot = await query
+    .offset((page - 1) * limit)
+    .limit(limit)
     .get();
 
-  // Filter results to only return main entries
   const items = snapshot.docs
     .map(doc => {
       const data = doc.data();
@@ -253,7 +273,7 @@ export async function getMediaItems(): Promise<MediaItem[]> {
                     !item.filename.includes('-medium.webp') && 
                     !item.filename.includes('-max.webp'));
 
-  return items;
+  return { items, total };
 }
 
 export async function updateMediaTags(id: string, tags: string[]): Promise<void> {

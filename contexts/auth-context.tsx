@@ -93,20 +93,52 @@ function DynamicAuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (user) {
-      // Get fresh token when user changes
-      user.getIdToken(true).then(token => {
+      // Get fresh token when user changes and sync with server session
+      user.getIdToken(true).then(async token => {
         setIdToken(token);
+        
+        // Create session cookie on server
+        try {
+          const response = await fetch('/api/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: token }),
+          });
+
+          if (!response.ok) {
+            console.error('Failed to create session:', await response.text());
+          }
+        } catch (error) {
+          console.error('Error creating session:', error);
+        }
       });
 
       // Set up token refresh
       const unsubscribe = setInterval(async () => {
-        const token = await user.getIdToken(true);
-        setIdToken(token);
+        try {
+          const token = await user.getIdToken(true);
+          setIdToken(token);
+          
+          // Refresh session cookie
+          const response = await fetch('/api/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: token }),
+          });
+
+          if (!response.ok) {
+            console.error('Failed to refresh session:', await response.text());
+          }
+        } catch (error) {
+          console.error('Error refreshing session:', error);
+        }
       }, 45 * 60 * 1000); // Refresh token every 45 minutes
 
       return () => clearInterval(unsubscribe);
     } else {
       setIdToken(null);
+      // Clear session cookie when user signs out
+      fetch('/api/auth/session', { method: 'DELETE' }).catch(console.error);
     }
   }, [user]);
 

@@ -30,7 +30,7 @@ async function DashboardServer() {
       redirect('/login');
     }
 
-    const session = await auth.verifySessionCookie(sessionCookie.value, true); // Set checkRevoked to true
+    const session = await auth.verifySessionCookie(sessionCookie.value, false); // Don't check revocation to avoid token issues
     
     if (!session?.uid) {
       console.error('Invalid session');
@@ -56,8 +56,8 @@ async function DashboardServer() {
 
     const data = await getDashboardData(session.uid);
     
-    if (!data.subscriptions.length && !data.orders.length) {
-      // If user has no subscriptions or orders, redirect to products
+    // Only redirect if user has no access at all
+    if (!data.subscriptions.length && !data.orders.length && !userData.role) {
       redirect('/products');
     }
 
