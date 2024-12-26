@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ImageUpload } from "@/components/ui/image-upload";
-import { MediaItem } from "@/services/server/media-library";
+import type { MediaItem } from "@/services/server/media-library";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Check, Loader2, Image, Video, Music, File, Info } from 'lucide-react';
-import { ContentType } from 'types/membership-page';
+import { Check, Loader2, ImageIcon, Video, Music, File, Info } from 'lucide-react';
+import { ContentType } from '@/types/membership-page';
+import type { MouseEvent } from 'react';
 
+// Rest of the file content remains the same
 interface MediaPickerProps {
   open: boolean;
   onClose: () => void;
@@ -75,32 +78,83 @@ function MediaDetailsDialog({ item, onClose }: MediaDetailsDialogProps) {
 export function MediaPicker({ open, onClose, onSelect, multiple = false }: MediaPickerProps) {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  const loadMediaItems = useCallback(async (pageNum: number, append = false) => {
+    try {
+      const response = await fetch(`/api/media?page=${pageNum}&limit=20`, {
+        credentials: 'include' // Include cookies in the request
+      });
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.error('Unauthorized: User is not an admin');
+          setItems([]);
+          setHasMore(false);
+          return null;
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Media API response:', data);
+      
+      if (data && data.items && Array.isArray(data.items)) {
+        setItems(prev => append ? [...prev, ...data.items] : data.items);
+        setHasMore(pageNum < data.totalPages);
+      } else {
+        console.error('Invalid response format:', data);
+        setItems([]);
+        setHasMore(false);
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error loading media items:', error);
+      return null;
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (open) {
-      loadMediaItems();
+      setPage(1);
+      setItems([]);
+      setHasMore(true);
+      loadMediaItems(1);
     }
-  }, [open]);
+  }, [open, loadMediaItems]);
 
-  const loadMediaItems = async () => {
-    try {
-      const response = await fetch('/api/media');
-      const data = await response.json();
-      console.log('Loaded media items:', data.map((item: MediaItem) => ({
-        filename: item.filename,
-        url: item.url,
-        contentType: item.contentType
-      })));
-      setItems(data);
-    } catch (error) {
-      console.error('Error loading media items:', error);
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore && !isLoading) {
+          setIsLoadingMore(true);
+          setPage(prev => prev + 1);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
     }
-  };
+
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore, isLoading]);
+
+  useEffect(() => {
+    if (page > 1) {
+      loadMediaItems(page, true);
+    }
+  }, [page, loadMediaItems]);
 
   const getMediaType = (filename: string): ContentType => {
     const extension = filename.split('.').pop()?.toLowerCase() || '';
@@ -123,7 +177,7 @@ export function MediaPicker({ open, onClose, onSelect, multiple = false }: Media
     const type = getMediaType(filename);
     switch (type) {
       case 'image':
-        return <Image className="h-6 w-6" />;
+        return <ImageIcon className="h-6 w-6" />;
       case 'video':
         return <Video className="h-6 w-6" />;
       case 'audio':
@@ -145,13 +199,14 @@ export function MediaPicker({ open, onClose, onSelect, multiple = false }: Media
       const response = await fetch('/api/media', {
         method: 'POST',
         body: formData,
+        credentials: 'include' // Include cookies in the request
       });
 
       if (!response.ok) throw new Error('Upload failed');
       const result = await response.json();
       console.log('Upload result:', result);
 
-      await loadMediaItems();
+      await loadMediaItems(1, false);
     } finally {
       setIsUploading(false);
     }
@@ -215,11 +270,17 @@ export function MediaPicker({ open, onClose, onSelect, multiple = false }: Media
                             onClick={() => handleSelect(item)}
                           >
                             {mediaType === 'image' ? (
-                              <img
-                                src={item.url}
-                                alt={item.filename}
-                                className="w-full h-full object-cover"
-                              />
+                              <div className="relative w-full h-full">
+                                <Image
+                                  src={item.url}
+                                  alt={item.filename}
+                                  fill
+                                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                  className="object-cover"
+                                  priority={false}
+                                  unoptimized
+                                />
+                              </div>
                             ) : (
                               <div className="flex flex-col items-center gap-2">
                                 {getMediaIcon(item.filename)}
@@ -231,7 +292,7 @@ export function MediaPicker({ open, onClose, onSelect, multiple = false }: Media
                             variant="ghost"
                             size="icon"
                             className="absolute top-2 right-2 p-1 bg-black/50 hover:bg-black/70 rounded-full text-white"
-                            onClick={(e) => {
+                            onClick={(e: MouseEvent) => {
                               e.stopPropagation();
                               setSelectedItem(item);
                             }}
@@ -246,6 +307,12 @@ export function MediaPicker({ open, onClose, onSelect, multiple = false }: Media
                         </div>
                       );
                     })}
+                    {(isLoading || isLoadingMore) && (
+                      <div className="col-span-4 flex justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    )}
+                    <div ref={observerTarget} className="h-4 w-full" />
                   </div>
                 </ScrollArea>
               )}

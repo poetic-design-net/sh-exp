@@ -32,24 +32,42 @@ async function verifyAdmin() {
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify admin session
     const { isAdmin } = await verifyAdmin();
     if (!isAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const items = await getMediaItems();
+    // Parse pagination parameters
+    const searchParams = request.nextUrl.searchParams;
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const category = searchParams.get('category') || undefined;
+
+    const { items, total } = await getMediaItems({
+      page,
+      limit,
+      category
+    });
     
-    // Cache die Response für 2 Minuten mit stale-while-revalidate
-    const response = NextResponse.json(items);
+    const response = NextResponse.json({
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    });
+
+    // Add strong caching headers with revalidation
     response.headers.set(
       'Cache-Control',
-      'public, s-maxage=120, stale-while-revalidate=60'
+      'public, max-age=60, stale-while-revalidate=600'
     );
     
-    // Füge Debugging-Header hinzu
-    response.headers.set('X-Total-Items', items.length.toString());
-    response.headers.set('X-Response-Time', Date.now().toString());
+    // Add cache tags for better cache management
+    response.headers.set(
+      'Cache-Tag',
+      `media-items,page-${page},category-${category || 'all'}`
+    );
     
     return response;
   } catch (error) {

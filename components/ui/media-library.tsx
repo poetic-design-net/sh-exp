@@ -1,18 +1,18 @@
 import React, { useState, useMemo } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "components/ui/button";
 import { Check, Trash2, Grid, List, Tag, Plus, Info, FolderPlus } from "lucide-react";
-import type { MediaItem } from "@/services/media-library";
-import { Input } from "@/components/ui/input";
+import type { MediaItem } from "services/server/media-library";
+import { Input } from "components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useToast } from "@/components/ui/use-toast";
+} from "components/ui/select";
+import { Badge } from "components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "components/ui/dialog";
+import { useToast } from "components/ui/use-toast";
 
 interface MediaLibraryProps {
   items: MediaItem[];
@@ -27,12 +27,12 @@ interface MediaLibraryProps {
 const ITEMS_PER_PAGE = 24;
 
 const CATEGORIES = [
-  { value: "all", label: "All" },
-  { value: "general", label: "General" },
-  { value: "products", label: "Products" },
-  { value: "banners", label: "Banners" },
-  { value: "gallery", label: "Gallery" },
-  { value: "uncategorized", label: "Uncategorized" }
+  { value: "all", label: "Alle" },
+  { value: "general", label: "Allgemein" },
+  { value: "products", label: "Produkte" },
+  { value: "banners", label: "Banner" },
+  { value: "gallery", label: "Galerie" },
+  { value: "uncategorized", label: "Nicht kategorisiert" }
 ];
 
 export function MediaLibrary({
@@ -58,39 +58,46 @@ export function MediaLibrary({
   const [showingInfo, setShowingInfo] = useState<string | null>(null);
 
   const categories = useMemo(() => {
-    const cats = new Set(items.map(item => item.category || 'uncategorized'));
-    return ['all', ...Array.from(cats)];
+    if (!Array.isArray(items) || items.length === 0) return ['all', 'uncategorized'];
+    const itemCategories = new Set(items.map(item => {
+      const category = item?.category || 'uncategorized';
+      return CATEGORIES.find(cat => cat.value === category) ? category : 'uncategorized';
+    }));
+    return ['all', ...Array.from(itemCategories)];
   }, [items]);
 
   const allTags = useMemo(() => {
+    if (!Array.isArray(items)) return [];
     const tags = new Set<string>();
     items.forEach(item => {
-      item.tags?.forEach(tag => tags.add(tag));
+      item?.tags?.forEach((tag: string) => tags.add(tag));
     });
     return Array.from(tags).sort();
   }, [items]);
 
   const filteredAndSortedItems = useMemo(() => {
+    if (!Array.isArray(items)) return [];
     let result = [...items];
 
     if (selectedCategory !== 'all') {
-      result = result.filter(item => 
-        selectedCategory === 'uncategorized' 
-          ? !item.category 
-          : item.category === selectedCategory
-      );
+      result = result.filter(item => {
+        if (selectedCategory === 'uncategorized') {
+          return !item.category || item.category === 'uncategorized';
+        }
+        return item.category === selectedCategory && CATEGORIES.some(cat => cat.value === selectedCategory);
+      });
     }
 
     if (selectedTags.length > 0) {
       result = result.filter(item => 
-        selectedTags.every(tag => item.tags?.includes(tag))
+        selectedTags.every((tag: string) => item.tags?.includes(tag))
       );
     }
 
     if (searchTerm) {
       result = result.filter(item =>
         item.filename.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+        item.tags?.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
@@ -120,7 +127,7 @@ export function MediaLibrary({
   );
 
   const formatFileSize = (bytes?: number) => {
-    if (bytes === undefined || bytes === null) return "Unknown size";
+    if (bytes === undefined || bytes === null) return "Unbekannte Größe";
     
     const units = ['B', 'KB', 'MB', 'GB'];
     let size = bytes;
@@ -145,14 +152,14 @@ export function MediaLibrary({
       try {
         await onUpdateTags(itemId, tags);
         toast({
-          title: "Success",
-          description: "Tags updated successfully",
+          title: "Erfolg",
+          description: "Tags erfolgreich aktualisiert",
         });
         setEditingTags(null);
       } catch (error) {
         toast({
-          title: "Error",
-          description: "Failed to update tags",
+          title: "Fehler",
+          description: "Tags konnten nicht aktualisiert werden",
           variant: "destructive",
         });
       }
@@ -164,14 +171,14 @@ export function MediaLibrary({
       try {
         await onUpdateCategory(itemId, category);
         toast({
-          title: "Success",
-          description: "Category updated successfully",
+          title: "Erfolg",
+          description: "Kategorie erfolgreich aktualisiert",
         });
         setEditingCategory(null);
       } catch (error) {
         toast({
-          title: "Error",
-          description: "Failed to update category",
+          title: "Fehler",
+          description: "Kategorie konnte nicht aktualisiert werden",
           variant: "destructive",
         });
       }
@@ -191,17 +198,25 @@ export function MediaLibrary({
         <div className="flex gap-4 items-center justify-between">
           <div className="flex gap-4 items-center flex-1 flex-wrap">
             <Input
-              placeholder="Search..."
+              placeholder="Suchen..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="max-w-xs"
             />
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <Select 
+              value={selectedCategory} 
+              onValueChange={setSelectedCategory}
+              defaultValue="all"
+            >
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Category..." />
+                <SelectValue placeholder="Kategorie..." />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map(cat => (
+                {CATEGORIES.filter(cat => {
+                  if (cat.value === 'all') return true;
+                  if (cat.value === 'uncategorized') return true;
+                  return Array.isArray(items) && items.some(item => item?.category === cat.value);
+                }).map(cat => (
                   <SelectItem key={cat.value} value={cat.value}>
                     {cat.label}
                   </SelectItem>
@@ -210,21 +225,21 @@ export function MediaLibrary({
             </Select>
             <Select value={sortBy} onValueChange={(value: "date" | "name" | "size") => setSortBy(value)}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Sort by..." />
+                <SelectValue placeholder="Sortieren nach..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="date">Date</SelectItem>
+                <SelectItem value="date">Datum</SelectItem>
                 <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="size">Size</SelectItem>
+                <SelectItem value="size">Größe</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sortOrder} onValueChange={(value: "asc" | "desc") => setSortOrder(value)}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Order..." />
+                <SelectValue placeholder="Reihenfolge..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="asc">Ascending</SelectItem>
-                <SelectItem value="desc">Descending</SelectItem>
+                <SelectItem value="asc">Aufsteigend</SelectItem>
+                <SelectItem value="desc">Absteigend</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -249,7 +264,7 @@ export function MediaLibrary({
         <div className="flex gap-2 items-center">
           <Tag className="h-4 w-4" />
           <div className="flex gap-2 flex-wrap">
-            {allTags.map(tag => (
+            {allTags.map((tag: string) => (
               <Badge
                 key={tag}
                 variant={selectedTags.includes(tag) ? "default" : "outline"}
@@ -257,7 +272,7 @@ export function MediaLibrary({
                 onClick={() => {
                   setSelectedTags(prev =>
                     prev.includes(tag)
-                      ? prev.filter(t => t !== tag)
+                      ? prev.filter((t: string) => t !== tag)
                       : [...prev, tag]
                   );
                 }}
@@ -334,7 +349,7 @@ export function MediaLibrary({
                 </div>
                 <div className="text-xs text-white text-center mt-1">
                   <div>{item.filename}</div>
-                  <div>{item.category || 'Uncategorized'}</div>
+                  <div>{item.category || 'Nicht kategorisiert'}</div>
                   <div>{formatFileSize(item.size)}</div>
                 </div>
               </div>
@@ -350,9 +365,9 @@ export function MediaLibrary({
         <div className="border rounded-md">
           <div className="grid grid-cols-[1fr_120px_120px_200px] gap-4 p-3 bg-muted font-medium">
             <div>Name</div>
-            <div>Date</div>
-            <div>Size</div>
-            <div>Actions</div>
+            <div>Datum</div>
+            <div>Größe</div>
+            <div>Aktionen</div>
           </div>
           <div className="divide-y">
             {paginatedItems.map((item) => (
@@ -367,7 +382,7 @@ export function MediaLibrary({
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-8 h-8 rounded overflow-hidden flex-shrink-0">
                     <img
-                      src={item.variants?.small?.url || item.url}
+                      src={item.variants?.small?.url ?? item.url}
                       alt={getDisplayName(item)}
                       className="w-full h-full object-cover"
                     />
@@ -375,11 +390,11 @@ export function MediaLibrary({
                   <div className="flex flex-col min-w-0">
                     <span className="truncate">{item.filename}</span>
                     <span className="text-xs text-muted-foreground">
-                      {item.category || 'Uncategorized'}
+                      {item.category || 'Nicht kategorisiert'}
                     </span>
                     {item.tags && item.tags.length > 0 && (
                       <div className="flex gap-1 flex-wrap">
-                        {item.tags.map(tag => (
+                        {item.tags.map((tag: string) => (
                           <Badge key={tag} variant="secondary" className="text-xs">
                             {tag}
                           </Badge>
@@ -389,7 +404,7 @@ export function MediaLibrary({
                   </div>
                 </div>
                 <div>{formatDate(item.createdAt)}</div>
-                <div>{formatFileSize(item.variants?.large?.size || item.size)}</div>
+                <div>{formatFileSize(item.variants?.large?.size ?? item.size)}</div>
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
@@ -443,14 +458,14 @@ export function MediaLibrary({
 
       {paginatedItems.length === 0 && (
         <div className="py-8 text-center text-muted-foreground">
-          {searchTerm ? "No images match your search" : "No images uploaded yet"}
+          {searchTerm ? "Keine Bilder entsprechen Ihrer Suche" : "Noch keine Bilder hochgeladen"}
         </div>
       )}
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
           <div className="text-sm text-muted-foreground">
-            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSortedItems.length)} of {filteredAndSortedItems.length} items
+            Zeige {((currentPage - 1) * ITEMS_PER_PAGE) + 1} bis {Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSortedItems.length)} von {filteredAndSortedItems.length} Elementen
           </div>
           <div className="flex gap-2">
             <Button
@@ -458,14 +473,14 @@ export function MediaLibrary({
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
             >
-              Previous
+              Zurück
             </Button>
             <Button
               variant="outline"
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
             >
-              Next
+              Weiter
             </Button>
           </div>
         </div>
@@ -475,12 +490,12 @@ export function MediaLibrary({
         <Dialog open={true} onOpenChange={() => setEditingTags(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit Tags</DialogTitle>
+              <DialogTitle>Tags bearbeiten</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Add new tag..."
+                  placeholder="Neuen Tag hinzufügen..."
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
                   onKeyDown={(e) => {
@@ -512,11 +527,11 @@ export function MediaLibrary({
                     }
                   }}
                 >
-                  Add
+                  Hinzufügen
                 </Button>
               </div>
               <div className="flex gap-2 flex-wrap">
-                {items.find(i => i.id === editingTags)?.tags?.map(tag => (
+                {Array.isArray(items) && items.find(i => i.id === editingTags)?.tags?.map((tag: string) => (
                   <Badge
                     key={tag}
                     variant="secondary"
@@ -524,7 +539,7 @@ export function MediaLibrary({
                     onClick={() => {
                       const item = items.find(i => i.id === editingTags);
                       if (item) {
-                        const updatedTags = item.tags?.filter(t => t !== tag) || [];
+                        const updatedTags = item.tags?.filter((t: string) => t !== tag) || [];
                         handleTagUpdate(editingTags, updatedTags);
                       }
                     }}
@@ -543,19 +558,19 @@ export function MediaLibrary({
         <Dialog open={true} onOpenChange={() => setEditingCategory(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit Category</DialogTitle>
+              <DialogTitle>Kategorie bearbeiten</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <Select
-                value={items.find(i => i.id === editingCategory)?.category || 'uncategorized'}
+                value={Array.isArray(items) ? (items.find(i => i.id === editingCategory)?.category || 'uncategorized') : 'uncategorized'}
                 onValueChange={(category) => {
-                  if (editingCategory) {
+                  if (editingCategory && CATEGORIES.some(cat => cat.value === category)) {
                     handleCategoryUpdate(editingCategory, category);
                   }
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder="Kategorie auswählen" />
                 </SelectTrigger>
                 <SelectContent>
                   {CATEGORIES.filter(cat => cat.value !== 'all').map(cat => (
@@ -574,39 +589,40 @@ export function MediaLibrary({
         <Dialog open={true} onOpenChange={() => setShowingInfo(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Image Information</DialogTitle>
+              <DialogTitle>Bildinformationen</DialogTitle>
             </DialogHeader>
             {(() => {
+              if (!Array.isArray(items)) return null;
               const item = items.find(i => i.id === showingInfo);
               if (!item) return null;
 
               return (
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-medium">Filename</h4>
+                    <h4 className="font-medium">Dateiname</h4>
                     <p className="text-sm text-muted-foreground">{item.filename}</p>
                   </div>
                   <div>
-                    <h4 className="font-medium">Category</h4>
+                    <h4 className="font-medium">Kategorie</h4>
                     <p className="text-sm text-muted-foreground">
-                      {item.category || 'Uncategorized'}
+                      {item.category || 'Nicht kategorisiert'}
                     </p>
                   </div>
                   <div>
-                    <h4 className="font-medium">Type</h4>
+                    <h4 className="font-medium">Typ</h4>
                     <p className="text-sm text-muted-foreground">{item.contentType}</p>
                   </div>
                   <div>
-                    <h4 className="font-medium">Size</h4>
+                    <h4 className="font-medium">Größe</h4>
                     <p className="text-sm text-muted-foreground">{formatFileSize(item.size)}</p>
                   </div>
                   <div>
-                    <h4 className="font-medium">Uploaded</h4>
+                    <h4 className="font-medium">Hochgeladen</h4>
                     <p className="text-sm text-muted-foreground">{formatDate(item.createdAt)}</p>
                   </div>
                   {item.variants && (
                     <div>
-                      <h4 className="font-medium">Available Sizes</h4>
+                      <h4 className="font-medium">Verfügbare Größen</h4>
                       <div className="space-y-2 mt-2">
                         {Object.entries(item.variants).map(([size, variant]) => (
                           <div key={size} className="flex items-center justify-between">
@@ -616,9 +632,13 @@ export function MediaLibrary({
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => window.open(variant?.url, '_blank')}
+                              onClick={() => {
+                                if (variant?.url) {
+                                  window.open(variant.url, '_blank');
+                                }
+                              }}
                             >
-                              View
+                              Anzeigen
                             </Button>
                           </div>
                         ))}

@@ -71,6 +71,7 @@
     "clsx": "^2.0.0",
     "cmdk": "^1.0.4",
     "crypto-browserify": "^3.12.1",
+    "dotenv": "^16.4.7",
     "embla-carousel-react": "^8.5.1",
     "encoding": "^0.1.13",
     "firebase": "^11.1.0",

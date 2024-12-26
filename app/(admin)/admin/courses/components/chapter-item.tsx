@@ -1,12 +1,13 @@
 "use client";
 
-import { Chapter, CourseContentItem } from "types/course";
+import { Chapter, CourseContentItem, CourseContentType } from "types/course";
 import { Button } from "components/ui/button";
 import { Input } from "components/ui/input";
 import { RichTextEditor } from "components/ui/rich-text-editor";
-import { GripVertical, ChevronDown, ChevronRight, X, Plus } from "lucide-react";
+import { GripVertical, ChevronDown, ChevronRight, X } from "lucide-react";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
 import { ContentEditor } from "./content-editor";
+import { ContentTypeButtons } from "./content-type-buttons";
 
 interface ChapterItemProps {
   chapter: Chapter;
@@ -15,7 +16,7 @@ interface ChapterItemProps {
   onToggle: () => void;
   onUpdate: (updates: Partial<Chapter>) => void;
   onDelete: () => void;
-  onAddContent: (type: "text" | "video-embed" | "image-grid" | "quiz") => void;
+  onAddContent: (type: CourseContentType) => void;
   onUpdateContent: (itemId: string, updates: Partial<CourseContentItem>) => void;
   onDeleteContent: (itemId: string) => void;
   setEditingItemId: (id: string | null) => void;
@@ -125,39 +126,10 @@ export function ChapterItem({
                 )}
               </Droppable>
 
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => onAddContent('text')}
-                  variant="outline"
-                  size="sm"
-                >
-                  Text
-                </Button>
-                <Button
-                  onClick={() => onAddContent('video-embed')}
-                  variant="outline"
-                  size="sm"
-                >
-                  Video
-                </Button>
-                <Button
-                  onClick={() => {
-                    setMediaType('image-grid');
-                    onAddContent('image-grid');
-                  }}
-                  variant="outline"
-                  size="sm"
-                >
-                  Bildergalerie
-                </Button>
-                <Button
-                  onClick={() => onAddContent('quiz')}
-                  variant="outline"
-                  size="sm"
-                >
-                  Quiz
-                </Button>
-              </div>
+              <ContentTypeButtons
+                onAddContent={onAddContent}
+                setMediaType={setMediaType}
+              />
             </div>
           )}
         </div>
