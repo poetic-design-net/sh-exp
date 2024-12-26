@@ -1,8 +1,9 @@
-import { db } from "@/lib/firebase-admin-server";
-import type { Subscription } from "@/types/membership";
-import type { Order } from "@/types/order";
-import type { Product } from "@/types/product";
-import type { DashboardSubscription } from "@/app/(auth)/app/dashboard/types";
+'use server';
+
+import { db } from "lib/firebase-admin-server";
+import type { Order } from "types/order";
+import type { Product } from "types/product";
+import type { DashboardSubscription } from "app/(auth)/app/dashboard/types";
 
 export interface DashboardData {
   subscriptions: DashboardSubscription[];
@@ -22,7 +23,7 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
   ]);
 
   // Get subscriptions with membership and product details
-  const subscriptionsPromises = subscriptionsSnapshot.docs.map(async (doc) => {
+  const subscriptionsPromises = subscriptionsSnapshot.docs.map(async (doc: FirebaseFirestore.QueryDocumentSnapshot) => {
     const subscriptionData = doc.data();
     const membershipId = subscriptionData.membershipId;
     const productId = subscriptionData.productId;
@@ -65,7 +66,7 @@ export async function getDashboardData(userId: string): Promise<DashboardData> {
 
   const subscriptions = await Promise.all(subscriptionsPromises);
 
-  const orders = ordersSnapshot.docs.map(doc => ({
+  const orders = ordersSnapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => ({
     id: doc.id,
     ...doc.data()
   })) as Order[];
