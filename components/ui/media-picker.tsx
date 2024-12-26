@@ -2,15 +2,16 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { ImageUpload } from "@/components/ui/image-upload";
-import type { MediaItem } from "@/services/server/media-library";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "components/ui/dialog";
+import { Button } from "components/ui/button";
+import { ImageUpload } from "components/ui/image-upload";
+import type { MediaItem } from "services/server/media-library";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "components/ui/tabs";
+import { ScrollArea } from "components/ui/scroll-area";
 import { Check, Loader2, ImageIcon, Video, Music, File, Info } from 'lucide-react';
-import { ContentType } from '@/types/membership-page';
 import type { MouseEvent } from 'react';
+
+type ContentType = 'image' | 'video' | 'audio' | 'pdf';
 
 interface MediaPickerProps {
   open: boolean;
@@ -88,7 +89,7 @@ export function MediaPicker({ open, onClose, onSelect, multiple = false }: Media
   const loadMediaItems = useCallback(async (pageNum: number, append = false) => {
     try {
       const response = await fetch(`/api/media?page=${pageNum}&limit=20`, {
-        credentials: 'include' // Include cookies in the request
+        credentials: 'include'
       });
       if (!response.ok) {
         if (response.status === 401) {
@@ -198,7 +199,7 @@ export function MediaPicker({ open, onClose, onSelect, multiple = false }: Media
       const response = await fetch('/api/media', {
         method: 'POST',
         body: formData,
-        credentials: 'include' // Include cookies in the request
+        credentials: 'include'
       });
 
       if (!response.ok) throw new Error('Upload failed');

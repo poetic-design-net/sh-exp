@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMediaItems, uploadMedia } from 'services/server/media-library';
+import { getMediaItems, uploadMedia } from 'app/actions/media';
 import { auth, db } from 'lib/firebase-admin-server';
 import { cookies } from 'next/headers';
 

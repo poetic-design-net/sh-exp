@@ -1,26 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAllMedia, handleMediaDelete, handleMediaUpload, handleUpdateTags,handleUpdateCategory } from "app/actions/media";
+import { deleteMedia, getMediaItems, updateMediaTags, updateMediaCategory } from "app/actions/media";
 import { ImageUpload } from "components/ui/image-upload";
 import { MediaLibrary } from "components/ui/media-library";
-import type { MediaItem } from "services/media-library";
+import type { MediaItem } from "services/server/media-library";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "components/ui/tabs";
 import { useToast } from "components/ui/use-toast";
 
 export default function MediaPage() {
   const { toast } = useToast();
   const [items, setItems] = useState<MediaItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string>();
 
   useEffect(() => {
-    loadMedia();
-  }, []);
+    loadMedia(currentPage);
+  }, [currentPage]);
 
-  const loadMedia = async () => {
-    const mediaItems = await getAllMedia();
-    setItems(mediaItems);
+  const loadMedia = async (page: number) => {
+    const result = await getMediaItems({ page, limit: 20 });
+    setItems(result.items);
+    setTotal(result.total);
   };
 
   const onUpload = async (file: File, category: string) => {
@@ -29,8 +32,15 @@ export default function MediaPage() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("category", category);
-      await handleMediaUpload(formData);
-      await loadMedia();
+      
+      const response = await fetch('/api/media', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) throw new Error('Upload failed');
+      await loadMedia(currentPage);
       toast({
         title: "Success",
         description: "Image uploaded successfully",
@@ -49,12 +59,12 @@ export default function MediaPage() {
   const onDelete = async (item: MediaItem) => {
     try {
       setIsDeleting(item.id);
-      await handleMediaDelete(item.id);
+      await deleteMedia(item.id);
       toast({
         title: "Success",
         description: "Image deleted successfully",
       });
-      await loadMedia();
+      await loadMedia(currentPage);
     } catch (error) {
       toast({
         title: "Error",
@@ -68,8 +78,8 @@ export default function MediaPage() {
 
   const onUpdateTags = async (id: string, tags: string[]) => {
     try {
-      await handleUpdateTags(id, tags);
-      await loadMedia();
+      await updateMediaTags(id, tags);
+      await loadMedia(currentPage);
       toast({
         title: "Success",
         description: "Tags updated successfully",
@@ -85,8 +95,8 @@ export default function MediaPage() {
 
   const onUpdateCategory = async (id: string, category: string) => {
     try {
-      await handleUpdateCategory(id, category);
-      await loadMedia();
+      await updateMediaCategory(id, category);
+      await loadMedia(currentPage);
       toast({
         title: "Success",
         description: "Category updated successfully",
@@ -117,6 +127,9 @@ export default function MediaPage() {
         <TabsContent value="library">
           <MediaLibrary
             items={items}
+            total={total}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
             onDelete={onDelete}
             isDeleting={isDeleting}
             onSelect={() => {}}
