@@ -1,14 +1,16 @@
 import * as admin from 'firebase-admin';
 import { getApps } from 'firebase-admin/app';
 
-// Load service account
-const serviceAccount = require('../components/stefanhiene-2ec0a-firebase-adminsdk-n9cn1-90a966e10a.json');
-
 // Initialize Firebase Admin SDK
 if (!getApps().length) {
+  // Parse service account from environment variable
+  const serviceAccount = JSON.parse(
+    Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || '', 'base64').toString()
+  );
+
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    storageBucket: 'stefanhiene-2ec0a.firebasestorage.app'
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET
   });
 }
 

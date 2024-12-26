@@ -39,7 +39,19 @@ export async function GET(request: NextRequest) {
     }
 
     const items = await getMediaItems();
-    return NextResponse.json(items);
+    
+    // Cache die Response für 2 Minuten mit stale-while-revalidate
+    const response = NextResponse.json(items);
+    response.headers.set(
+      'Cache-Control',
+      'public, s-maxage=120, stale-while-revalidate=60'
+    );
+    
+    // Füge Debugging-Header hinzu
+    response.headers.set('X-Total-Items', items.length.toString());
+    response.headers.set('X-Response-Time', Date.now().toString());
+    
+    return response;
   } catch (error) {
     console.error('Error in GET /api/media:', error);
     return NextResponse.json(

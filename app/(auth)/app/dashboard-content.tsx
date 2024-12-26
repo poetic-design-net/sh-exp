@@ -2,8 +2,8 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "components/ui/tabs";
 import { StatisticsCards } from "./dashboard/components/statistics-cards";
 import { MembershipsTab } from "./dashboard/components/memberships-tab";
 import { OrdersTab } from "./dashboard/components/orders-tab";

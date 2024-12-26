@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import { DashboardContent } from "./dashboard-content";
-import { getDashboardData } from "@/services/dashboard-server";
-import { auth } from "@/lib/firebase-admin";
+import { getDashboardData } from "services/dashboard-server";
+import { auth } from "lib/firebase-admin-server";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 // Loading placeholder
 function DashboardSkeleton() {
@@ -20,21 +21,38 @@ export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 async function DashboardServer() {
-  const cookiesList = await cookies();
-  const sessionCookie = cookiesList.get('session');
-  const session = await auth.verifySessionCookie(sessionCookie!.value);
-  const data = await getDashboardData(session.uid);
+  try {
+    const cookiesList = cookies();
+    const sessionCookie = cookiesList.get('session');
 
-  return (
-    <DashboardContent 
-      user={{
-        displayName: session.name || null,
-        email: session.email || null
-      }}
-      subscriptions={data.subscriptions}
-      orders={data.orders}
-    />
-  );
+    if (!sessionCookie?.value) {
+      console.error('No session cookie found');
+      redirect('/login');
+    }
+
+    const session = await auth.verifySessionCookie(sessionCookie.value);
+    
+    if (!session?.uid) {
+      console.error('Invalid session');
+      redirect('/login');
+    }
+
+    const data = await getDashboardData(session.uid);
+
+    return (
+      <DashboardContent 
+        user={{
+          displayName: session.name || null,
+          email: session.email || null
+        }}
+        subscriptions={data.subscriptions}
+        orders={data.orders}
+      />
+    );
+  } catch (error) {
+    console.error('Error in DashboardServer:', error);
+    redirect('/login');
+  }
 }
 
 export default function UserDashboard() {
